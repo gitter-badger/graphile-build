@@ -4,13 +4,17 @@ import debugFactory from "debug";
 import addStartEndCursor from "./addStartEndCursor";
 
 import type { Plugin } from "graphile-build";
+import type { Inflector } from "../inflections";
 
 const debugSql = debugFactory("graphile-build-pg:sql");
 
 export default (async function PgAllRows(
   builder,
-  { pgInflection: inflection, pgViewUniqueKey: viewUniqueKey }
+  { pgInflection, pgViewUniqueKey }
 ) {
+  const viewUniqueKey: ?string =
+    typeof pgViewUniqueKey === "string" ? pgViewUniqueKey : null;
+  const inflection: Inflector = pgInflection;
   builder.hook(
     "GraphQLObjectType:fields",
     (

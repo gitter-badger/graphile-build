@@ -256,107 +256,109 @@ export default (async function PgIntrospectionPlugin(
     }
   }
 
-  builder.registerWatcher(async triggerRebuild => {
-    // In case we started listening before, clean up
-    await stopListening();
+  builder.registerWatcher(triggerRebuild => {
+    (async () => {
+      // In case we started listening before, clean up
+      await stopListening();
 
-    // Check we can get a pgClient
-    if (pgConfig instanceof pg.Pool || quacksLikePgPool(pgConfig)) {
-      pgClient = await pgConfig.connect();
-      releasePgClient = () => pgClient && pgClient.release();
-    } else if (typeof pgConfig === "string") {
-      pgClient = new pg.Client(pgConfig);
-      pgClient.on("error", e => {
-        debug("pgClient error occurred: %s", e);
-      });
-      releasePgClient = () =>
-        new Promise((resolve, reject) => {
-          if (pgClient) pgClient.end(err => (err ? reject(err) : resolve()));
-          else resolve();
+      // Check we can get a pgClient
+      if (pgConfig instanceof pg.Pool || quacksLikePgPool(pgConfig)) {
+        pgClient = await pgConfig.connect();
+        releasePgClient = () => pgClient && pgClient.release();
+      } else if (typeof pgConfig === "string") {
+        pgClient = new pg.Client(pgConfig);
+        pgClient.on("error", e => {
+          debug("pgClient error occurred: %s", e);
         });
-      await new Promise((resolve, reject) => {
-        if (pgClient) {
-          pgClient.connect(err => (err ? reject(err) : resolve()));
-        } else {
-          resolve();
-        }
-      });
-    } else {
-      throw new Error(
-        "Cannot watch schema with this configuration - need a string or pg.Pool"
-      );
-    }
-    // Install the watch fixtures.
-    const watchSqlInner = await readFile(WATCH_FIXTURES_PATH, "utf8");
-    const sql = `begin; ${watchSqlInner}; commit;`;
-    try {
-      await pgClient.query(sql);
-    } catch (error) {
-      /* eslint-disable no-console */
-      console.warn(
-        `${chalk.bold.yellow(
-          "Failed to setup watch fixtures in Postgres database"
-        )} ️️⚠️`
-      );
-      console.warn(
-        chalk.yellow(
-          "This is likely because your Postgres user is not a superuser. If the"
-        )
-      );
-      console.warn(
-        chalk.yellow(
-          "fixtures already exist, the watch functionality may still work."
-        )
-      );
-      console.warn(
-        chalk.yellow("Enable DEBUG='graphile-build-pg' to see the error")
-      );
-      debug(error);
-      /* eslint-enable no-console */
-      await pgClient.query("rollback");
-    }
-
-    await pgClient.query("listen postgraphql_watch");
-
-    const handleChange = async () => {
-      debug(`Schema change detected: re-inspecting schema...`);
-      introspectionResultsByKind = await introspect();
-      debug(`Schema change detected: re-inspecting schema complete`);
-      triggerRebuild();
-    };
-
-    listener = async notification => {
-      if (notification.channel !== "postgraphql_watch") {
-        return;
+        releasePgClient = () =>
+          new Promise((resolve, reject) => {
+            if (pgClient) pgClient.end(err => (err ? reject(err) : resolve()));
+            else resolve();
+          });
+        await new Promise((resolve, reject) => {
+          if (pgClient) {
+            pgClient.connect(err => (err ? reject(err) : resolve()));
+          } else {
+            resolve();
+          }
+        });
+      } else {
+        throw new Error(
+          "Cannot watch schema with this configuration - need a string or pg.Pool"
+        );
       }
+      // Install the watch fixtures.
+      const watchSqlInner = await readFile(WATCH_FIXTURES_PATH, "utf8");
+      const sql = `begin; ${watchSqlInner}; commit;`;
       try {
-        const payload = JSON.parse(notification.payload);
-        payload.payload = payload.payload || [];
-        if (payload.type === "ddl") {
-          const commands = payload.payload
-            .filter(
-              ({ schema }) => schema == null || schemas.indexOf(schema) >= 0
-            )
-            .map(({ command }) => command);
-          if (commands.length) {
-            handleChange();
-          }
-        } else if (payload.type === "drop") {
-          const affectsOurSchemas = payload.payload.some(
-            schemaName => schemas.indexOf(schemaName) >= 0
-          );
-          if (affectsOurSchemas) {
-            handleChange();
-          }
-        } else {
-          throw new Error(`Payload type '${payload.type}' not recognised`);
-        }
-      } catch (e) {
-        debug(`Error occurred parsing notification payload: ${e}`);
+        await pgClient.query(sql);
+      } catch (error) {
+        /* eslint-disable no-console */
+        console.warn(
+          `${chalk.bold.yellow(
+            "Failed to setup watch fixtures in Postgres database"
+          )} ️️⚠️`
+        );
+        console.warn(
+          chalk.yellow(
+            "This is likely because your Postgres user is not a superuser. If the"
+          )
+        );
+        console.warn(
+          chalk.yellow(
+            "fixtures already exist, the watch functionality may still work."
+          )
+        );
+        console.warn(
+          chalk.yellow("Enable DEBUG='graphile-build-pg' to see the error")
+        );
+        debug(error);
+        /* eslint-enable no-console */
+        await pgClient.query("rollback");
       }
-    };
-    pgClient.on("notification", listener);
-    introspectionResultsByKind = await introspect();
+
+      await pgClient.query("listen postgraphql_watch");
+
+      const handleChange = async () => {
+        debug(`Schema change detected: re-inspecting schema...`);
+        introspectionResultsByKind = await introspect();
+        debug(`Schema change detected: re-inspecting schema complete`);
+        triggerRebuild();
+      };
+
+      listener = async notification => {
+        if (notification.channel !== "postgraphql_watch") {
+          return;
+        }
+        try {
+          const payload = JSON.parse(notification.payload);
+          payload.payload = payload.payload || [];
+          if (payload.type === "ddl") {
+            const commands = payload.payload
+              .filter(
+                ({ schema }) => schema == null || schemas.indexOf(schema) >= 0
+              )
+              .map(({ command }) => command);
+            if (commands.length) {
+              handleChange();
+            }
+          } else if (payload.type === "drop") {
+            const affectsOurSchemas = payload.payload.some(
+              schemaName => schemas.indexOf(schemaName) >= 0
+            );
+            if (affectsOurSchemas) {
+              handleChange();
+            }
+          } else {
+            throw new Error(`Payload type '${payload.type}' not recognised`);
+          }
+        } catch (e) {
+          debug(`Error occurred parsing notification payload: ${e}`);
+        }
+      };
+      pgClient.on("notification", listener);
+      introspectionResultsByKind = await introspect();
+    })();
   }, stopListening);
 
   builder.hook("build", build => {

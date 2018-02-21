@@ -48,7 +48,7 @@ export default function makeProcField(
       getNamedType,
       isCompositeType,
     },
-  }: {| ...Build |},
+  }: { ...Build },
   {
     fieldWithHooks,
     computed = false,

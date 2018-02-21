@@ -25,7 +25,7 @@ const debug = debugFactory("graphile-builder");
 const INDENT = "  ";
 
 export type Options = {
-  [string]: mixed,
+  [string]: *,
 };
 
 export type Plugin = (

@@ -26,6 +26,8 @@ export type {
   SchemaListener,
 } from "./SchemaBuilder";
 
+export type { FieldWithHooksFunction } from "./makeNewBuild";
+
 export const getBuilder = async (
   plugins: Array<Plugin>,
   options: Options = {}
