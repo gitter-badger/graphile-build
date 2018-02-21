@@ -8,3 +8,7 @@
 [libs]
 
 [options]
+module.name_mapper='^\(.*graphile.*\|graphql-parse-resolve-info\)$' -> '<PROJECT_ROOT>/packages/\1/src/index.js'
+
+[lints]
+untyped-type-import=error
