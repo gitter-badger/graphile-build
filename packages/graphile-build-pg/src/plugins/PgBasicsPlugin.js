@@ -4,6 +4,9 @@ import type { Plugin } from "graphile-build";
 import { version } from "../../package.json";
 
 const defaultPgColumnFilter = (_attr, _build, _context) => true;
+import type { Build } from "graphile-build";
+
+export type BuildExtension = {||};
 
 export default (function PgBasicsPlugin(
   builder,
@@ -13,7 +16,10 @@ export default (function PgBasicsPlugin(
     pgColumnFilter = defaultPgColumnFilter,
   }
 ) {
-  builder.hook("build", build => {
+  builder.hook("build", (build: { ...Build }): {
+    ...Build,
+    ...BuildExtension,
+  } => {
     return build.extend(build, {
       graphileBuildPgVersion: version,
       pgSql: sql,

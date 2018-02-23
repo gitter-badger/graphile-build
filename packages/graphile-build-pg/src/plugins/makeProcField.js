@@ -7,7 +7,10 @@ import addStartEndCursor from "./addStartEndCursor";
 import viaTemporaryTable from "./viaTemporaryTable";
 
 import type { Build, FieldWithHooksFunction } from "graphile-build";
-import type { Proc } from "./PgIntrospectionPlugin";
+import type {
+  Proc,
+  BuildExtension as PgIntrospectionPluginBuildExtension,
+} from "./PgIntrospectionPlugin";
 import type { SQL } from "pg-sql2";
 
 const debugSql = debugFactory("graphile-build-pg:sql");
@@ -48,7 +51,7 @@ export default function makeProcField(
       getNamedType,
       isCompositeType,
     },
-  }: { ...Build },
+  }: { ...Build, ...PgIntrospectionPluginBuildExtension },
   {
     fieldWithHooks,
     computed = false,

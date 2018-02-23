@@ -10,9 +10,17 @@ import { quacksLikePgPool } from "../withPgClient";
 
 import { version } from "../../package.json";
 
+import type { Build } from "graphile-build";
+
 const debug = debugFactory("graphile-build-pg");
 const INTROSPECTION_PATH = `${__dirname}/../../res/introspection-query.sql`;
 const WATCH_FIXTURES_PATH = `${__dirname}/../../res/watch-fixtures.sql`;
+
+type IntrospectionResultsByKind = {};
+
+export type BuildExtension = {|
+  pgIntrospectionResultsByKind: IntrospectionResultsByKind,
+|};
 
 // Ref: https://github.com/postgraphql/postgraphql/tree/master/src/postgres/introspection/object
 
@@ -361,9 +369,15 @@ export default (async function PgIntrospectionPlugin(
     })();
   }, stopListening);
 
-  builder.hook("build", build => {
-    return build.extend(build, {
-      pgIntrospectionResultsByKind: introspectionResultsByKind,
-    });
+  builder.hook("build", (build: { ...Build }): {
+    ...Build,
+    ...BuildExtension,
+  } => {
+    return build.extend(
+      build,
+      ({
+        pgIntrospectionResultsByKind: introspectionResultsByKind,
+      }: BuildExtension)
+    );
   });
 }: Plugin);
